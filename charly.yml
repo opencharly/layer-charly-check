@@ -23,7 +23,8 @@ adb-skill:
         family: check
         owner: charly-check
         description: |-
-            MUST be invoked before any work involving: the `adb:` check verb (declarative, dispatched to the out-of-process plugin candy/plugin-adb), Android Debug Bridge interaction, APK install/uninstall, device shell command execution, system property reads, screencap, logcat tailing — anywhere the goal is to drive a running Android emulator from outside the container via the host-published ADB server port.
+            The `adb:` check verb (declarative, dispatched to the out-of-process plugin candy/plugin-adb) — Android Debug Bridge interaction, APK install/uninstall, device shell, system properties, screencap, logcat tailing. Use before driving a running Android emulator from outside the container.
+
         triggers:
             - "the `adb:` check verb / Android Debug Bridge probing from a candy/box plan (out-of-process plugin; devices, shell, install, getprop, screencap, logcat, wait-for-device)"
         content: |
@@ -272,7 +273,8 @@ android-skill:
         family: check
         owner: charly-check
         description: |-
-            MUST be invoked before any work involving: the `kind: android` schema kind, a `target: android` deploy (the external `deploy:android` substrate), the `apk:` layer package format (installing Android apps declaratively), the android deploy preresolver, an in-pod emulator OR a remote/physical adb-endpoint device, or nested `pod → android` deployment. The first-class Android device + app surface that sits above the `adb:`/`appium:` check verbs.
+            The `kind: android` schema kind, a `target: android` deploy (the external deploy:android substrate), the `apk:` layer package format, the android deploy preresolver, an in-pod emulator OR a remote/physical adb-endpoint device, or nested pod-to-android deployment.
+
         triggers:
             - "`kind: android` device / `target: android` deploy / `apk:` package format in candies / installing Android apps declaratively / remote-or-emulator adb endpoint / nested `pod \u2192 android`"
         content: |
@@ -505,7 +507,8 @@ appium-skill:
         family: check
         owner: charly-check
         description: |-
-            MUST be invoked before any work involving: the `appium:` check verb (declarative, dispatched to the out-of-process plugin candy/plugin-appium), Android UI automation, WebDriver session management, APK install via Appium, element find/click/send-keys, mobile-specific WebDriver caps — anywhere the goal is to drive a running Appium 3.x server inside a container via W3C WebDriver from outside.
+            The `appium:` check verb (declarative, dispatched to the out-of-process plugin candy/plugin-appium) — Android UI automation, WebDriver session management, APK install via Appium, element find/click/send-keys, mobile WebDriver caps.
+
         triggers:
             - "the `appium:` check verb / Android UI automation (out-of-process plugin) / W3C WebDriver sessions, element introspection, the gesture/app/key/device sugar groups, the generic `execute`/`raw` escape hatch"
         content: |
@@ -868,11 +871,8 @@ cdp-skill:
         family: check
         owner: charly-check
         description: |-
-            Chrome DevTools Protocol browser automation via the declarative `cdp:` check
-            verb, served out-of-process by `candy/plugin-cdp`.
-            MUST be invoked before any work involving: the `cdp:` check verb, Chrome
-            DevTools Protocol, browser automation, clicking elements, taking screenshots,
-            or OAuth flows inside containers.
+            Chrome DevTools Protocol browser automation via the declarative `cdp:` check verb, served out-of-process by candy/plugin-cdp. Use before browser automation, clicking elements, screenshots, or OAuth flows inside containers.
+
         content: |
             # CDP - Chrome DevTools Protocol
 
@@ -1512,11 +1512,8 @@ check-skill:
         family: check
         owner: charly-check
         description: |-
-            MUST be invoked for every `charly check` mode, candy or box plan authoring,
-            disposable test beds, R10 runs, agent grading, baked plan labels, or check
-            operation. Covers image/live/run, the plugin-provided live probe verbs,
-            deterministic verb catalog, runtime variables, overlays, plan inclusion,
-            cross-deployment probing, and the bounded AI-iteration harness.
+            Every `charly check` mode, candy or box plan authoring, disposable test beds, R10 runs, agent grading, baked plan labels, or check operation. Covers image/live/run, the plugin-provided live probe verbs, deterministic verb catalog, runtime variables, overlays, plan inclusion, cross-deployment probing.
+
         triggers:
             - "`charly check *` (ANY check verb, incl. `charly check box`) / `charly check run <bed>` (the disposable-deploy R10 bed) / authoring `disposable: true` check beds / `charly check live` / the probe verbs (cdp/wl/dbus/vnc/mcp/record/spice/libvirt) / `iterate:` AI-agent scoring / `plan:` step authoring / `charlycheck/*` branches"
             - "Agent Driven Evaluation (ADE) / `charly box feature run` / `charly check feature run` / `charly feature list/pending/validate` / authoring a candy's `plan:` + `description:` string / the agent grader for `agent-check:` steps"
@@ -3534,10 +3531,8 @@ check-sway-browser-vnc-skill:
         family: check
         owner: charly-check
         description: |-
-            The DISPOSABLE pod bed (check-sway-browser-vnc-pod) for R10 testing of the Sway
-            desktop verb surface (cdp / wl / vnc / dbus / mcp / record). Deploys the
-            shipping sway-browser-vnc image. Use when running or maintaining the
-            live-container check bed for the sway stack.
+            The DISPOSABLE pod bed (check-sway-browser-vnc-pod) for R10 testing of the Sway desktop verb surface (cdp / wl / vnc / dbus / mcp / record). Deploys the shipping sway-browser-vnc image. Use when running/maintaining the live-container check bed for the sway stack.
+
         content: |
             # check-sway-browser-vnc
 
@@ -3642,12 +3637,8 @@ dbus-skill:
         family: check
         owner: charly-check
         description: |-
-            D-Bus interaction inside containers via the declarative `dbus:` check verb,
-            served out-of-process by `candy/plugin-dbus` (EXEC-based, `gdbus` over the
-            executor reverse channel).
-            MUST be invoked before any work involving: the `dbus:` check verb, desktop
-            notifications, D-Bus method calls, service introspection, or session bus
-            interaction.
+            D-Bus interaction inside containers via the declarative `dbus:` check verb, served out-of-process by candy/plugin-dbus (EXEC-based, gdbus over the executor reverse channel). Use before desktop notifications, D-Bus method calls, service introspection, or session bus interaction.
+
         content: |
             # D-Bus -- D-Bus Interaction Inside Containers
 
@@ -3792,7 +3783,8 @@ libvirt-skill:
         family: check
         owner: charly-check
         description: |-
-            the `libvirt:` libvirt-RPC check verb for VMs — domain info, framebuffer screenshots, send-key, passwd, QMP, qemu-guest-agent client, snapshots, events — served out-of-process by candy/plugin-vm.
+            The `libvirt:` libvirt-RPC check verb for VMs — domain info, framebuffer screenshots, send-key, passwd, QMP, qemu-guest-agent client, snapshots, events — served out-of-process by candy/plugin-vm.
+
         content: |
             # libvirt — VM libvirt-RPC check verb
 
@@ -4130,10 +4122,8 @@ record-skill:
         family: check
         owner: charly-check
         description: |-
-            Record terminal sessions (asciinema) or desktop video (pixelflux/wf-recorder)
-            via the declarative `record:` check verb, served out-of-process by `candy/plugin-record`.
-            MUST be invoked before any work involving: the `record:` check verb, terminal recording,
-            desktop video recording, or session capture.
+            Record terminal sessions (asciinema) or desktop video (pixelflux/wf-recorder) via the declarative `record:` check verb, served out-of-process by candy/plugin-record. Use before terminal recording, desktop video recording, or session capture.
+
         content: |
             # Record -- Terminal and Desktop Recording
 
@@ -4377,7 +4367,8 @@ spice-skill:
         family: check
         owner: charly-check
         description: |-
-            the `spice:` SPICE-wire check verb for VMs — handshake, native-SPICE display screenshots, and input injection, served out-of-process by candy/plugin-spice (the vendored Shells-com/spice library).
+            The `spice:` SPICE-wire check verb for VMs — handshake, native-SPICE display screenshots, input injection — served out-of-process by candy/plugin-spice (the vendored Shells-com/spice library).
+
         content: |
             # SPICE — VM display-protocol check verb
 
@@ -4620,11 +4611,8 @@ vnc-skill:
         family: check
         owner: charly-check
         description: |-
-            VNC/RFB desktop automation via the declarative `vnc:` check verb, served
-            out-of-process by `candy/plugin-vnc` (covers pod AND vm targets).
-            MUST be invoked before any work involving: the `vnc:` check verb, VNC
-            automation, RFB protocol desktop interaction, VNC screenshots, clicking
-            coordinates, or VNC authentication.
+            VNC/RFB desktop automation via the declarative `vnc:` check verb, served out-of-process by candy/plugin-vnc (covers pod AND vm targets). Use before VNC automation, RFB protocol interaction, VNC screenshots, clicking coordinates, or VNC authentication.
+
         content: |
             # VNC - VNC Desktop Automation
 
