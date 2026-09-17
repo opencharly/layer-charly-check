@@ -1518,6 +1518,7 @@ check-skill:
             - "`charly check *` (ANY check verb, incl. `charly check box`) / `charly check run <bed>` (the disposable-deploy R10 bed) / authoring `disposable: true` check beds / `charly check live` / the probe verbs (cdp/wl/dbus/vnc/mcp/record/spice/libvirt) / `iterate:` AI-agent scoring / `plan:` step authoring / `charlycheck/*` branches"
             - "Agent Driven Evaluation (ADE) / `charly box feature run` / `charly check feature run` / `charly feature list/pending/validate` / authoring a candy's `plan:` + `description:` string / the agent grader for `agent-check:` steps"
             - "the `adb:` check verb / Android Debug Bridge probing from a candy/box plan (out-of-process plugin; devices, shell, install, getprop, screencap, logcat, wait-for-device)"
+            - "the `jetkvm:` check verb / IP-KVM control from a candy/box plan (out-of-process plugin; status, screenshot, keyboard/mouse, power/ATX, virtual media, USB, device config)"
             - "the `appium:` check verb / Android UI automation (out-of-process plugin) / W3C WebDriver sessions, element introspection, the gesture/app/key/device sugar groups, the generic `execute`/`raw` escape hatch"
             - "Verify a cutover by running the R10 beds (drive `charly check run <bed>`)"
             - "Evaluate/audit a deployment config (image or deploy, yours)"
