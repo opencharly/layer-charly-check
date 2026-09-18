@@ -5246,6 +5246,17 @@ jetkvm-skill:
             so an on-device download would be MITM-exposed. `verify` asserts `charly version`
             equals the requested CalVer and that a baked command word dispatches project-less.
 
+            The same tool derives the `jetkvm:` verb's environment from the ONE ssh
+            connection — `charly-jetkvm env --host root@<device> --export` reads the device's
+            `local_auth_token` and prints `JETKVM_HOST` + `JETKVM_AUTH_TOKEN`, so a device can
+            be driven with no committed hostname and no hand-copied token:
+
+            ```sh
+            eval "$(charly-jetkvm env --host root@jk.example.ts.net --export)"
+            charly check run jetkvm-device-readonly      # status + screenshot
+            charly check run jetkvm-input-probe          # move/click/drag/key/type + screenshots
+            ```
+
             **There is deliberately NO `charly mcp serve` on the device.** The appliance has
             ~199 MB RAM and one core; running the MCP server forked a full CLI model and
             exhausted memory, hanging the device. The appliance gets `charly` only for local
