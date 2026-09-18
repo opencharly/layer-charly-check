@@ -5196,6 +5196,17 @@ jetkvm-skill:
             accept the self-signed certificate a JetKVM ships by default (needed for an
             `https://` device; also required for the signaling websocket).
 
+            **The device address is resolved in order: the authored `host:`, then the
+            `JETKVM_HOST` environment variable, then the deploy venue's address.** Author no
+            `host:` and set `JETKVM_HOST` to keep a device-specific hostname out of a
+            committed plan — the same shape `JETKVM_AUTH_TOKEN` / `JETKVM_PASSWORD` already
+            give credentials. No device hostname belongs in a repository.
+
+            Input methods: `move`/`mouse` are a pure position move when no `button:` is
+            authored (no button is pressed); `click` and any method that names a `button:`
+            press and release it. `button` defaults to `left`, so `click` needs no
+            `button:`.
+
             NOTE on video: do not gate a screenshot on the device's `getVideoState.ready`
             field. Measured on firmware 0.5.9, `ready` reports whether the device's native
             capture PIPELINE is currently running — which is started per WebRTC session and
