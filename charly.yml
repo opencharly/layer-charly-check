@@ -1,4 +1,4 @@
-version: 2026.249.2125
+version: 2026.240.1943
 charly-check:
     candy:
         version: 2026.218.1200
@@ -2327,9 +2327,9 @@ check-skill:
                   exercised as in-development code when the bed lives with its owner. The main
                   repo's `charly.yml` owns the core mechanism beds above (loader / InstallPlan /
                   IR / deploy-target / plugin-host seams, plus the multi-owner command
-                  witnesses); the `box/<distro>` submodules own the distro beds (arch, cachyos,
+                  witnesses); the distro submodules own the distro beds (arch, cachyos,
                   debian, fedora, ubuntu, omarchy) and run from that submodule (e.g. `charly -C
-                  box/fedora check run check-pod`; the real submodule path is `distro-fedora/`).
+                  distro-fedora check run check-pod` from the umbrella root).
                   Relocated to their artifact owners: `check-docs` → `layer-docs-site`;
                   `check-marketplace` → `plugin-marketplace`; `check-dsh-pod` → `pod-dsh`;
                   `check-agentteams-pod` / `-snapshot` / `-vm` → `layer-agentteams`;
