@@ -2100,11 +2100,14 @@ check-skill:
                     cloud image) when the variable is elapsed time against a shared floor.
                   - **A full nested-container acceptance loop** — e.g. `cbx-e2e-loop`,
                     which leases a real nested container via `local-container`, syncs a git
-                    workdir and streams a command. Its own work is minutes-long, so it
-                    exceeds the 120s default even though nothing is wedged (measured on
-                    distro-cachyos: killed at `2m0s` under host load, PASS once the step
-                    declared its own bound). A check bed's long acceptance steps are a
-                    normal case for an authored bound — not a sign of a hang.
+                    workdir and streams a command. Its own work is minutes-long: on
+                    distro-cachyos the enclosing `check-live` bucket (129 checks incl. this
+                    one) measures **2m39s idle and 3m07s under concurrent host load** —
+                    both above the 120s default, so the step is killed by the bound on its
+                    own duration, not by a wedge (before the bound was declared it was
+                    killed at `2m0s`; with `timeout: 10m` it PASSes). A check bed's long
+                    acceptance steps are a normal case for an authored bound — not a sign
+                    of a hang.
 
                   The fix is authored, not code: `#Op` carries `timeout?: #Duration`, and
                   `ProbeNeverHang` honours a longer authored value over the floor (the
