@@ -1591,7 +1591,7 @@ check-skill:
             |--------|---------|-------------|
             | Pure-box check (disposable, build-context) | `charly check box <image>` | Candy + box sections only, in `podman run --rm` (no host port mappings, no volumes attached) |
             | Live full-stack check (running deployment) | `charly check live <name> [-i instance]` | All three sections run via `podman exec` / SSH / nested chain, with full runtime variable resolution |
-            | R10 bed (full sequence) | `charly check run <bed>` | Build → check image → deploy → check live → fresh update → tear down on a `disposable: true` deploy (ONE bed per invocation). Canonical R10 gate; for a whole roster fan the short beds out via `/verify-beds` and own each long bed (`vm`/`android`, or last run ≥600s) as a persistent-session `run_in_background` task |
+            | R10 bed (full sequence) | `charly check run <bed>` | Build → check image → deploy → check live → fresh update → tear down on a `disposable: true` deploy (ONE bed per invocation). Canonical R10 gate; for a whole roster declare a `kind:check-roster` entity and run it with `charly check run <roster>` (bounded `lanes`, exclusive-token serial chains, host-local refusal) |
             | AI iteration loop | `charly check run <bed>` | Drives an AI through plateau-bounded iterations against a bed carrying an `iterate:` block |
             | Validate authored tests at config time | `charly box validate` | Schema, context/variable consistency, id uniqueness |
             | Inspect effective spec | `charly box inspect <image>` | JSON includes merged check structure |
@@ -1646,8 +1646,8 @@ check-skill:
             - `/charly-internals:capabilities` — the `ai.opencharly.description` label (`LabelDescriptionSet`) carrying the baked plan is
               part of the same capability contract as `LabelService`.
             - `/charly-internals:agents` — the sub-agents (`check-bed-runner`,
-              `deploy-verifier`) and dynamic workflows (`/verify-beds`,
-              `/audit-deploy-configs`) that drive these beds, and the R10/disposable/
+              `deploy-verifier`) and dynamic workflows (`/audit-deploy-configs`) that
+              drive these beds, and the R10/disposable/
               paste-proof rules that bind any agent or workflow running `charly check run`.
             - `/charly-internals:plugin` — a `check:` step's `<word>: <input>` verb sugar dispatches
               to a plugin-provided verb (built-in or out-of-tree); the desugared internal input is
@@ -1662,7 +1662,7 @@ check-skill:
             field in a candy/box `charly.yml`, the disposable test-bed deploys, the
             `ai.opencharly.description` OCI label, `kind: agent` (the agent grader) or a
             `disposable: true` deploy (+ its `iterate:` block),
-            `charly check run <bed>` (disposable R10 deploys; roster fan-out via `/verify-beds`), or any check
+            `charly check run <bed>` / `charly check run <roster>` (disposable R10 deploys; a whole roster is a `kind:check-roster` entity), or any check
             verb by name (file/port/http/command/package/service/cdp/wl/dbus/vnc/mcp/...).
         references:
             - name: authoring-gotchas
@@ -2236,20 +2236,19 @@ check-skill:
 
                   So `ok: true` + `total_seconds: 0` + a single `prereq-*-skipped` step IS the skip signature.
                   The authoritative discriminator is the **process exit code 3** (charly also prints a
-                  `SKIPPED — …` line); never count a bed as passed from `summary.yml` alone. `/verify-beds`
+                  `SKIPPED — …` line); never count a bed as passed from `summary.yml` alone. The roster engine
                   keys on the exit code for exactly this reason. And a wrapper script's own exit code is
                   not the bed verdict — a script that pipes or post-processes `charly check run` must
                   capture `${PIPESTATUS[0]}` (the charly exit) and corroborate the on-disk `summary.yml`;
                   a notification-level exit 0 can mask a charly exit 1.
 
                   To run a
-                  whole roster, fan the beds out concurrently, by owner: the short beds via the
-                  `/verify-beds` workflow (one `charly check run <bed>` process per agent), and every
-                  long bed — a `vm`/`android` substrate, or one whose last run took ≥600s — as its own
-                  `run_in_background` task owned by the persistent session, because an ephemeral
-                  sub-agent cannot own a bed that outlives its turn. `/verify-beds` defers the long beds
-                  (returning `deferredLongBeds[]`) and refuses host-local ones rather than running them;
-                  its `gateComplete: false` means the roster is partial. Either way wall-clock collapses
+                  whole roster, declare a `kind:check-roster` entity (a `check-roster:` node in the
+                  project `charly.yml`) and run `charly check run <roster>`. The roster engine
+                  enumerates every disposable bed (namespace-qualified), runs them on a bounded
+                  `lanes` worker pool, serializes beds that share an `requires_exclusive:`/
+                  `requires_shared:` token (auto-derived from each bed's own declaration), refuses
+                  host-local beds by default, and aggregates honest exit codes. Wall-clock collapses
                   to ≈ the slowest single bed (see "Approximate wall-clock" below).
 
                   ### Flag discipline — the `iterate:`/bed config IS the test specification
@@ -2262,12 +2261,11 @@ check-skill:
                   `--plateau-iteration`, `--max-scenario`, `--tag`, `--skip-rebuild`,
                   `--on-pod` / `--on-vm` / `--on-host`, `--keep-repo`, `--dry-run`, and the bed
                   flags `--no-rebuild` (skips the R10 fresh-rebuild gate) and `--keep`.
-                  (Fanning the full roster out concurrently — the short beds via `/verify-beds`,
-                  one `charly check run <bed>` per agent, and the long beds as persistent-session
-                  `run_in_background` tasks — is scope-expanding, not shrinking: it is in-spec
-                  without authorization when "R10 gate by change class" mandates the full
-                  fan-out for a cross-cutting change, and needs authorization only as a
-                  substitute for the class-mandated gate.) Internal-voice triggers — "tractable wall-clock", "for the
+                  (Fanning the full roster out concurrently — `charly check run <roster>` on a
+                  `kind:check-roster` entity, its `lanes` pool overlapping every bed — is
+                  scope-expanding, not shrinking: it is in-spec without authorization when "R10
+                  gate by change class" mandates the full fan-out for a cross-cutting change,
+                  and needs authorization only as a substitute for the class-mandated gate.) Internal-voice triggers — "tractable wall-clock", "for the
                   canary", "to fit session bounds", "shorten this run", "skip the heavy leg",
                   "faster iteration cycle" — are confessions, not defences. The `iterate:`
                   block's `plateau_iteration` and the AI's `progress_no_improvement_timeout` together
@@ -2387,15 +2385,12 @@ check-skill:
                   (`check-sway-browser-vnc-pod` ~2477s ≈ 41 min incl. image build) longer.
 
                   **These are load-dependent, and the idle figures mislead.** A bed's own newest
-                  `.check/<bed>/<calver>/summary.yml` `total_seconds:` is the only honest number, and it is
-                  what `/verify-beds` reads to decide whether a bed is too long for a sub-agent to own
-                  (≥600s ⇒ deferred to the persistent session). Under a 16-way roster, several pod beds cross
-                  that line even though they finish in ~2 min idle. `charly check run <bed>` runs exactly ONE bed, so a roster run is N
-                  of them — and running them sequentially would make wall-clock ≈ the sum. To
-                  collapse that to ≈ the slowest single bed, fan the beds out concurrently — one
-                  `charly check run <bed>` process per owner: a per-agent process for the short beds
-                  (`/verify-beds`, an agent team), and a persistent-session `run_in_background` task for
-                  each long bed, which no sub-agent can own (see `/charly-internals:agents`
+                  `.check/<bed>/<calver>/summary.yml` `total_seconds:` is the only honest number for its
+                  duration. `charly check run <bed>` runs exactly ONE bed, so a roster run is N
+                  of them — and running them sequentially would make wall-clock ≈ the sum. The
+                  `kind:check-roster` engine collapses that to ≈ the slowest single bed: it runs the
+                  selected beds concurrently on its bounded `lanes` pool and serializes only the
+                  exclusive-token groups (see `/charly-check:check` and `/charly-internals:agents`
                   "Speed levers"). The dominant cost is
                   the step-1 `charly box build`: a pod bed builds the image once — the "fresh
                   `charly update`" R10 step is a `systemctl restart` onto the already-built image, not
@@ -2623,7 +2618,7 @@ check-skill:
                   | **Documentation-only change class** — `*.md` (`AGENTS.md` / `CLAUDE.md`, the marketplace corpus's `**/SKILL.md`, READMEs, CHANGELOG), comment-only code edits, or a submodule pointer bump to an all-documentation submodule commit; zero behavior change | markdown integrity, link checks | The non-runtime standards: adversarial consistency review, the R5 grep self-test, cross-reference validation, and command-safety gates | `documentation reviewed` | ANY bed run or image build — beds cannot fail on prose |
                   | **Hook / workflow scripts** — `.claude/hooks/*.sh`, `.claude/workflows/*.js` | `bash -n` / async-body parse | Execute the changed script live: run the hook directly (paste its output); a workflow whose control flow changed runs against ONE bed matching the change. Prompt-string-only workflow edits: parse + the non-runtime standards | `fully tested and validated` | The full bed fan-out |
                   | **Harness project configuration** — `AGENTS.md`, `.codex/**`, repo-native `.agents/**`, or an executable that provisions or validates those surfaces | Parse the changed configuration; run the project profile and static-validator checks; verify exact gitlink and linked-worktree provenance | Run the final-tree repository harness gate: execute each changed validator/provisioner directly, verify only the gitlinks dispatched by the change class at their recorded revisions, and run the committed developer-profile checks. A Git-provisioning change also proves its canonical-object reference and exact-gitlink behavior in a dedicated linked worktree. Record the exact approved commands and active managed sandbox available for this run. This proves repository-controlled behavior; never claim that it proves settings loaded by a newly launched harness process. The fresh validator independently decides whether the final-tree delta additionally requires a Charly R10 bed and runs it when required. | `fully tested and validated` | A forced restart/new session, alternate home/cache/workspace, or unrelated VM/container roster that cannot exercise repository configuration |
-                  | **`charly` Go code** | `go test ./...` + `go vet` + the R9 source build (R9 freshness + `charly version` check against the worktree `bin/charly`) | `charly check run <bed>` for EACH bed whose kind matches a touched code path: box/candy/pod/deploy-target mechanism → `check-pod`; `target: local` → `check-local`; VM / kubernetes → `check-k3s-vm`; a feature surface → its feature bed. Cross-cutting loader / resolver / IR / unified-schema changes → fan every matching bed out concurrently, by owner: short beds via `/verify-beds` (one `charly check run <bed>` per agent), every long bed (`vm`/`android`, or last run ≥600s) as a persistent-session `run_in_background` task — in-spec for that class, not a scope override; a `/verify-beds` result with `gateComplete: false` is a partial roster, never a green gate | `fully tested and validated` | Beds whose substrate the change cannot reach |
+                  | **`charly` Go code** | `go test ./...` + `go vet` + the R9 source build (R9 freshness + `charly version` check against the worktree `bin/charly`) | `charly check run <bed>` for EACH bed whose kind matches a touched code path: box/candy/pod/deploy-target mechanism → `check-pod`; `target: local` → `check-local`; VM / kubernetes → `check-k3s-vm`; a feature surface → its feature bed. Cross-cutting loader / resolver / IR / unified-schema changes → run the matching beds as one `kind:check-roster` roster (`charly check run <roster>`, its `lanes` pool overlapping every bed) — in-spec for that class, not a scope override; a roster run that does not include every matching bed is a partial roster, never a green gate | `fully tested and validated` | Beds whose substrate the change cannot reach |
                   | **Contract / library module** — a Go module with NO `charly.yml` project, NO `main`/deployable target and therefore NO `disposable: true` entity (the `github.com/opencharly/spec` + `github.com/opencharly/sdk` contract modules; any standalone library repo) | none beyond the suite | Run the repo's OWN committed module CI (`.github/workflows/ci.yml`: `go build ./...` + `go test ./...` + `gofmt -l .` + `golangci-lint run ./...`) GREEN on the PR head — the module suite IS the gate, because no bed CAN exist (a bed that cannot fail on the change proves nothing). The suite must genuinely EXECUTE the changed paths (a test that would FAIL without the change), not merely compile them. The `no disposable target` premise is a negative claim: prove it with executed output (`git ls-files \| grep -c 'charly.yml'` → 0; `git grep -c 'disposable: true'` → no match). A change whose behaviour is observable only at a CONSUMER's live boundary names the consumer PR running that bed — the bed rides the consumer change (producer→consumer order, B6), never the library PR | `fully tested and validated` | A `charly check run` bed in the module repo — none can exist there; the consumer boundary bed belongs to the consumer PR |
                   | **Candy / box / pod / vm / kubernetes / local / android config** | `charly box validate` | Build + run a bed that composes the changed entity (a candy edit → a bed whose image stacks that candy); when no bed composes it, the R7 sequence on a disposable deploy: build → `charly check box` → deploy → `charly check live` → fresh `charly update` | `fully tested and validated` | Beds that do not compose the changed entity |
                   | **`iterate:` / ai check config** | `charly box validate` | The affected `iterate:` bed run as specified (see "Flag discipline") | `fully tested and validated` | Unrelated beds |
@@ -2664,7 +2659,7 @@ check-skill:
                   `charly check run <bed>` propagates `2` when the bed's **check step** (check-image /
                   check-live) fails on checks, but `1` when an **infra step** (build / deploy /
                   vm-create) fails — so a broken bed image is distinguishable from a genuine
-                  test failure. When `/verify-beds` fans a roster out, it aggregates the per-bed
+                  test failure. The `kind:check-roster` engine aggregates the per-bed
                   exit codes — reporting `2` only when *every* failing bed failed on checks, and
                   `1` when any bed hit an infra failure. Implementation:
                   the sdk owns the error/exit types — `sdk.ExitCodeError` + `sdk.CheckFailExitCode` /
@@ -5123,10 +5118,11 @@ jetkvm-skill:
         family: check
         owner: charly-check
         description: |-
-            The `jetkvm:` check/control verb (declarative, dispatched to the out-of-process plugin candy/plugin-jetkvm) — drive a JetKVM IP-KVM without a browser over its own WebRTC control plane: screenshots, keyboard/mouse input, ATX/DC power, virtual media, USB gadget, device configuration. Also covers installing the appliance-resident `charly` on a JetKVM (armv7) via the `charly-jetkvm` tool, and why no MCP server runs on the device. Use before any JetKVM device interaction from a candy/box plan.
+            The `jetkvm:` check/control verb (declarative, dispatched to the out-of-process plugin candy/plugin-jetkvm) — drive a JetKVM IP-KVM without a browser over its own WebRTC control plane: screenshots, OCR screen-reading, keyboard/mouse input, ATX/DC power, virtual media, USB gadget, device configuration, and a CONFIGURABLE console-installer driver for a `kind: jetkvm` device. Also covers installing the appliance-resident `charly` on a JetKVM (armv7) via the `charly-jetkvm` tool, and why no MCP server runs on the device. Use before any JetKVM device interaction from a candy/box plan.
 
         triggers:
-            - "the `jetkvm:` check verb / driving a JetKVM IP-KVM from a candy/box plan (out-of-process plugin; status, screenshot, keyboard/mouse, power, virtual media, USB, device config)"
+            - "the `jetkvm:` check verb / driving a JetKVM IP-KVM from a candy/box plan (out-of-process plugin; status, screenshot, ocr, keyboard/mouse, power, virtual media, USB, device config)"
+            - "a `kind: jetkvm` device entity / the `install` method / console-installer recipe / driving an OS installer (e.g. Omarchy) remotely over a KVM / wait-for-screen OCR"
             - "installing charly on a JetKVM / `charly-jetkvm` / running charly on the armv7 appliance / why there is no MCP server on the JetKVM"
         content: |
             # JetKVM — IP-KVM control from a `jetkvm:` check verb
@@ -5189,7 +5185,7 @@ jetkvm-skill:
 
             ## Methods
 
-            Read-only (no gate): `status`, `screenshot`, `version`, `video-state`,
+            Read-only (no gate): `status`, `screenshot`, `ocr`, `version`, `video-state`,
             `usb-state`, `atx-state`, `dc-state`, `virtual-media-state`, `storage-files`,
             `wol-devices`, `macros`, `keyboard-layout`, `timezones`, `cloud-state`,
             `network-state`, `network-settings`, `tailscale-status`, `update-status`,
@@ -5197,23 +5193,116 @@ jetkvm-skill:
             `diagnostics`, `check-media-url`, `usb-config`.
 
             Mutating (need `allow_control: true`): `key`, `type`, `key-combo`, `macro`,
-            `click`, `mouse`, `move`, `scroll`, `drag`, `power`, `dc-power`, `reboot`, `wol`,
-            `virtual-media`, `usb-device`, `usb-emulation`, `set-settings`, `set-edid`,
-            `set-video`, `set-display`, `set-audio`, `set-network`, `set-tailscale`,
-            `set-devmode`, `set-ssh-key`, `set-tls`, `set-keyboard-layout`, `set-macros`,
-            `set-jiggler`, `set-extension`, `set-wol-devices`, `set-log-level`,
-            `renew-dhcp`, `rpc`.
+            `click`, `mouse`, `move`, `scroll`, `drag`, `install`, `power`, `dc-power`,
+            `reboot`, `wol`, `wake-host`, `virtual-media`, `usb-device`, `usb-emulation`,
+            `set-settings`,
+            `set-edid`, `set-video`, `set-display`, `set-audio`, `set-network`,
+            `set-tailscale`, `set-devmode`, `set-ssh-key`, `set-tls`,
+            `set-keyboard-layout`, `set-macros`, `set-jiggler`, `set-extension`,
+            `set-wol-devices`, `set-log-level`, `renew-dhcp`, `rpc`.
 
             Never autonomous: `factory-reset`, `update`.
 
-            The `rpc` method is the raw escape hatch: author `rpc_method:` (the device
-            JSON-RPC method) and optionally `rpc_params:` (a JSON object), so a method the
-            plugin has not typed yet is reachable without a release. It is deliberately
+            `wake-host` vs `wol`: `wake-host` sends the device's own USB HID wake report
+            (upstream's `wakeHost` RPC) and wakes a host that is **display-asleep**
+            (DPMS); `wol` sends a magic packet and only helps a host that is **powered
+            off**. A screenshot whose diagnostics boundary is "zero RTP"/"RTP stalled"
+            (the device sent no media — a host with no HDMI signal) now appends a hint
+            naming these two methods instead of a bare frame-wait timeout.
+
+            ## Screen reading — `ocr` and `artifact_contains_text`
+
+            Two wait-for-screen primitives, both running tesseract **on the HOST** (the plugin
+            process is host-side, so the captured bytes are local — no venue round-trip):
+
+            - `ocr` (read-only) captures a frame, OCRs it, and asserts `text` is present
+              (case-insensitive). The method form: no artifact required.
+              ```yaml
+              - check: the installer greeter is showing
+                jetkvm: {method: ocr, text: "Press Return to Start Install"}
+                context: [runtime]
+                eventually: 120s
+                retry_interval: 5s
+              ```
+            - `artifact_contains_text` (on `screenshot`) runs the SDK's shared artifact
+              validator over the pulled PNG — the same OCR assertion in `screenshot` form,
+              composable with `artifact_min_bytes` / `artifact_not_uniform`.
+
+            Failing to RUN is not failing to MATCH: a missing tesseract (or missing
+            `tesseract-data-eng`) returns a named error, never a vacuous "not found".
+
+            ## The configurable console-installer driver — `install` + `kind: jetkvm`
+
+            `install` (mutating) drives a text-console OS installer end to end with nobody at
+            the keyboard: it connects ONCE and walks an ordered `steps:` recipe, OCR-waiting
+            for each screen's anchor before sending that screen's key/type/combo input.
+
+            WHY ONE CONNECTION: the verb opens a fresh WebRTC session per `dispatch` call
+            (0.8–1.6 s connect, a 1.5–6.7 s `/webrtc/signaling/client` handshake per capture).
+            A ~15-screen wizard as a chain of `check:` steps pays that per screen; the driver
+            pays it once.
+
+            The recipe is DATA, supplied by a `kind: jetkvm` device entity — the plugin is
+            installer-agnostic (R3), so one plugin drives any text console. Example:
+
+            ```yaml
+            omarchy-kvm:
+                jetkvm:
+                    installer:
+                        answer_secrets:
+                            password: OMARCHY_KVM_PASSWORD   # credential store — never plaintext
+                        answers:
+                            username: omarchy
+                            hostname: omarchy
+                        steps:
+                            - wait_for: Press Return to Start Install
+                              action: key
+                              key: Return
+                            - wait_for: "Username>"
+                              action: type
+                              text: "{{username}}"
+                            # ...
+            ```
+
+            - `wait_for` MUST be **screen-UNIQUE**. A string present on every screen (an OS
+              logo, a window title) passes vacuously and desynchronises the whole drive —
+              measured on Omarchy, whose logo OCRs on every wizard screen.
+            - `action:` is `key` / `type` / `key-combo`; an action-less step is a pure wait.
+            - `{{name}}` placeholders in `text:` resolve from `answers:` (literal,
+              single-pass — NOT charly `${VAR}` expansion, which does NOT reach plugin_input).
+            - `answer_secrets:` maps a placeholder name to a CREDENTIAL-STORE KEY, resolved at
+              run time, so a password or LUKS passphrase never lands in `charly.yml`.
+            - `timeout_sec:` bounds each screen's wait (default 120; the final reboot step
+              wants a large value).
+
+            A step can also reference the entity by name (`install: {device: omarchy-kvm}`),
+            resolved out-of-process over the reverse channel; authored step `steps:`/`answers:`
+            win over the entity's.
+
+            **Authoring a `kind: jetkvm` entity needs a load-time anchor.** A flat external
+            `kind` connects only when its plugin candy is in the LOAD-TIME candy scan closure
+            (a project candy's `candy:`/`require:` ref), because kind decode runs at the loader
+            walk's Boundary — BEFORE any deploy tree exists. A deploy-node `add_candy:` is too
+            late for a kind (it connects at the deploy/check walk, the VERB path), even though
+            the parse-time prescan recognizes the word. So a project authoring a `kind: jetkvm`
+            entity must also reference the plugin from a discovered candy (see distro-omarchy's
+            `candy/omarchy-kvm`).
+
+            **The driver is NOT a backup of the machine.** A console installer wipes a disk.
+            The machine behind a KVM is never disposable, so an install drive is a DELIBERATE
+            OPERATOR ACTION — not a `disposable: true` CI bed. Author the read-only OCR
+            pre-flight as a `check:` and the destructive drive as a separate, operator-run
+            deploy.
+
+            ## The raw escape hatch — `rpc`
+
+            `rpc` invokes a device JSON-RPC method the plugin has not typed yet: author
+            `rpc_method:` and optionally `rpc_params:` (a JSON object). It is deliberately
             **MUTATING** — it can invoke ANY device method, so an ungated escape hatch would
-            be a bypass of the safety gate — and it requires `allow_control: true`. Even
-            then it refuses the irreversible reimaging methods (`factoryReset`,
-            `tryUpdate`, `tryUpdateComponents`), matching the never-autonomous rule its
-            typed counterparts obey.
+            bypass the safety gate — and requires `allow_control: true`. Even then it refuses
+            the irreversible reimaging methods (`factoryReset`, `tryUpdate`,
+            `tryUpdateComponents`), matching the never-autonomous rule their typed
+            counterparts obey.
 
             ## Credentials
 
@@ -5289,6 +5378,19 @@ jetkvm-skill:
             eval "$(charly-jetkvm env --host root@jk.example.ts.net --export)"
             charly check run jetkvm-device-readonly      # status + screenshot
             charly check run jetkvm-input-probe          # move/click/drag/key/type + screenshots
+            ```
+
+            **Repair a device with no auth token.** Upstream JetKVM mints
+            `local_auth_token` ONLY on a successful login/setup and never re-mints it at
+            startup, so a password-mode device whose token was cleared (logout, config
+            reset, a crash before save) answers HTTP 401 to every authenticated request.
+            `charly-jetkvm auth` heals exactly that: it writes a fresh uuid into
+            `local_auth_token` and restarts `jetkvm_app` — ONLY when the field is empty,
+            NEVER overwriting an existing token. `env --heal` repairs then prints:
+
+            ```sh
+            charly-jetkvm auth --host root@jk.example.ts.net           # print the token
+            eval "$(charly-jetkvm env --host root@jk.example.ts.net --export --heal)"
             ```
 
             **There is deliberately NO `charly mcp serve` on the device.** The appliance has
