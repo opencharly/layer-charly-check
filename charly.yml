@@ -5402,165 +5402,25 @@ jetkvm-skill:
             project-less verbs. Driving the KVM remains the host-side `jetkvm:` verb above,
             which talks to the device's control plane directly and needs no charly on it.
 
-            ## The console TERMINAL SESSION — open, run a command, read the OCR result, close
+            ## Console terminal session, flow, LUKS, and boot order — see the canonical skill
 
-            Beyond the one-shot installer wizard, four methods drive an INTERACTIVE shell (or
-            the initramfs prompt) on the controlled machine and READ EACH RESULT BY OCR. They
-            share the SDK's transport-agnostic `kit.ConsoleSession` engine, so the SAME methods
-            serve the JetKVM (`kit.ConsoleTransport` over USB HID) and SPICE (over its
-            keyboard) — one authored action, two transports (R3).
+            Beyond the one-shot installer wizard, the `jetkvm:` verb exposes the
+            TRANSPORT-NEUTRAL console actions — `open-terminal`, `run-command` (with
+            sudo + `expect` + `prompt_anchors`), `close-terminal`, `luks-unlock`,
+            `flow` (continuous OCR-until-condition + if/then/else + case/switch +
+            bounded while, with reference-screenshot outcomes and auto-resume), and
+            `boot-order` (the OS-side `efibootmgr`). The SAME actions serve the
+            JetKVM (USB HID) and the VM (SPICE).
 
-            - `open-terminal` (mutating) opens a terminal and waits for a shell prompt. It
-              sends `terminal_combo` (default `super+Return`, Omarchy's terminal hotkey) or
-              switches to a bare text TTY with `terminal_combo: "ctrl+alt+F3"`, then OCR-waits
-              for one of `prompt_anchors` (default `["$", "#", ">"]`).
-            - `run-command` (mutating) runs `commands:` in the OPEN terminal, OCR-reading each
-              result; `close_terminal: true` exits afterwards. Each command supports
-              `sudo: true` and an `expect:` substring that must appear in the output.
-            - `close-terminal` (mutating) sends `exit`.
-            - `luks-unlock` (mutating) types the disk-encryption passphrase at the initramfs
-              prompt and waits for a SUCCESS anchor; a wrong passphrase is caught by a
-              built-in failure anchor (`No key available`, `wrong password`) and FAILS the
-              step — never a silent "outcome".
+            The mechanism, the authoring surface, the marker-line/echo-trap and
+            OCR-upscale RCAs, the flow vocabulary, and the measured hardware facts
+            are documented ONCE in the canonical **`/charly-check:console-automation`**
+            skill — read it before authoring any console session/flow. This skill
+            covers only the JetKVM-specific device surface (above).
 
-            ```yaml
-            # open a terminal, run two commands (one via sudo), read the output, close
-            - check: the installed system reports Omarchy and is reachable
-              context: [runtime]
-              jetkvm:
-                  method: run-command
-                  allow_control: true
-                  sudo_password_secret: OMARCHY_KVM_PASSWORD   # credential store
-                  commands:
-                      - {command: "cat /etc/os-release | grep ID=", expect: "omarchy"}
-                      - {command: "efibootmgr", sudo: true, expect: "BootOrder"}
-                  close_terminal: true
-            ```
-
-            **COMPLETION IS A MARKER LINE, NOT A PROMPT (RCA).** A shell reuses one terminal
-            across commands, and a prompt string is neither screen-unique nor stable — worse,
-            the terminal ECHOES the typed line, so waiting for the command text (or for the
-            marker as a SUBSTRING) passes the instant the command was typed, BEFORE it ran,
-            certifying completion that never happened. So `run-command` types
-            `command; echo <opaque-marker>` and waits for a screen LINE whose trimmed text
-            EQUALS the marker — only the shell's OWN output produces that, which is the real
-            completion condition. It is a condition poll, never a sleep (R4).
-
-            Secrets never land in `charly.yml`: `sudo_password_secret:` and
-            `passphrase_secret:` name credential-store keys, resolved over the reverse channel
-            exactly like the device `password_secret:` (R3).
-
-            ## `luks-unlock` — the encrypted-install first boot
-
-            A default Omarchy install is **encrypted**: it stops at an initramfs prompt reading
-            `A password is required to access the root volume:`. There is no shell there, so
-            completion is a screen condition: `luks-unlock` enters `passphrase:` (or
-            `passphrase_secret:`) and waits for `outcomes:` (default: `login:`, `Welcome`,
-            `succeeded`, `Booting`). A failure anchor fails fast.
-
-            > **RCA — HID was never "dead".** An earlier investigation concluded the KVM's HID
-            > input did not reach the target because a *graphical* lock screen appeared not to
-            > change on typing. That was WRONG: the dark screen was Plymouth/an initramfs prompt
-            > the framebuffer OCR could not read past, and `Ctrl+Alt+Del` HAD rebooted the
-            > machine all along. Two measured facts settled it: (1) the terminal accepted input
-            > and echoed it; (2) `run-command` typed into a root shell on the live ISO and read
-            > its real output back. A graphical compositor's mask and a dead input path look
-            > identical on a screenshot — do not conclude "input is dead" without an
-            > input-echoed check.
-
-            ## The console FLOW — continuous OCR-until-condition with control flow
-
-            `flow` (mutating) drives a BOUNDED STATE MACHINE over the console. It exists
-            because a fixed anchor + fixed timeout is brittle on a real machine (a boot screen
-            appears at an unknown time; a passphrase may succeed or fail; an installer may
-            offer or skip a screen). A flow makes all of it explicit DATA:
-
-            - **CONTINUOUS OCR-until-condition** — each node's `wait:` lists one or more NAMED
-              outcomes; the engine re-captures + OCRs (a real condition poll) until ANY
-              outcome's `match` substring appears, and reports WHICH. No guessed wait time.
-            - **if/then/else + case/switch** — `transitions:` maps an outcome NAME to the next
-              node id; the OBSERVED outcome selects the branch. A matched outcome with no
-              transition falls through to `next:` (or ends the flow).
-            - **while loop** — a transition pointing BACK to an earlier node is a loop, bounded
-              by `flow_max_loops` (per node) and `flow_max_steps` (whole flow). A condition
-              that never becomes true FAILS naming `max_loops` — the R4-safe form of "repeat
-              until".
-
-            A node's action may be a raw input (`key`/`combo`/`text`) OR a shell `command:`
-            (run in the open terminal, its output OCR-read — the session marker path).
-
-            ```yaml
-            # log in as root, then list the EFI boot entries — continuous OCR + routing
-            - check: log in and read the EFI boot order
-              context: [runtime]
-              jetkvm:
-                  method: flow
-                  allow_control: true
-                  flow_start: login
-                  flow_nodes:
-                      login:
-                          wait: [{name: prompt, match: "login:"}]
-                          text: "root"
-                          next: submit
-                      submit:
-                          wait:
-                              - {name: shell, match: "archiso"}
-                              - {name: pw, match: "Password:", failure: true}
-                          key: Return
-                          transitions: {shell: listboot}
-                      listboot:
-                          wait: [{name: shell, match: "~"}]
-                          command: "efibootmgr"
-                          expect: "BootOrder"
-                          timeout_sec: 60
-            ```
-
-            The flow is validated WITHOUT a device (`Validate`): a start node, every transition
-            and `next` naming a real node, non-empty matches. Malformed flows fail before any
-            session.
-
-            ## Boot order — the OS-side EFI boot manager
-
-            `boot-order` (mutating) sets the UEFI boot order from INSIDE the running system,
-            using the EFI boot manager (`efibootmgr`) in an open terminal — the OS-side
-            counterpart to pressing the firmware boot-menu key (`F11`/`F12`):
-
-            - `boot_order_action: list` — run `efibootmgr` and read the entries + `BootOrder`.
-            - `boot_order_action: next` + `boot_order_entry: "0003"` — one-time NEXT boot
-              (`--bootnext`), ideal for booting an installer medium ONCE then returning to the
-              disk. Needs root.
-            - `boot_order_action: set` + `boot_order_sequence: "0003,0001"` — persist the order
-              (`--bootorder`). Needs root.
-
-            `boot_order_command:` overrides the binary (default `efibootmgr`). `next`/`set`
-            write firmware NVRAM and need `sudo_password:`/`sudo_password_secret:`; a missing
-            password fails with a clear message rather than hanging at a prompt.
-
-            ## Firmware boot order — the measured target-side facts
-
-            Measured on a real ASRock X670E (Ryzen 9700X, UEFI 3.30):
-            - **The disk boots FIRST.** Booting the live ISO requires either the firmware
-              boot-menu key or an OS-side `efibootmgr --bootnext` — a plain reboot boots the
-              installed disk into the initramfs/LUKS prompt.
-            - **The firmware boot menu / setup is reachable by hammering the key during POST.**
-              A `macro` of repeated `F11` (ASRock boot menu) or `F2`/`Delete` (setup) catches it
-              — a single key press usually misses the window. The boot menu lists the medium
-              (`Omarchy 4.0.4 Live (SAMSUNG …)`), the installed disk (`Limine (…)`), and
-              `UEFI OS`.
-            - **The Omarchy bootloader is limine** and auto-boots the disk after a countdown;
-              its menu (`Omarchy Bootloader`, `Select ENTER Boot`) is NOT the firmware menu.
-
-            ## Cross-transport genericity (JetKVM ↔ VM)
-
-            Every console action above is transport-NEUTRAL DATA. The MECHANISM lives in
-            `sdk/kit` (`ConsoleWizard`, `ConsoleSession`, `ConsoleFlow`); each transport
-            implements the small `kit.ConsoleTransport` interface (`Capture` / `PressKey` /
-            `PressCombo` / `Type`). `plugin-jetkvm` supplies the USB-HID transport;
-            `plugin-spice` supplies the SPICE-keyboard transport. So one recipe/flow/session
-            authored once drives either a physical machine (via the KVM) or a VM console (via
-            `spice: wizard`). A `kind: jetkvm` entity is the shared, transport-neutral home of
-            that DATA.
-
+            In brief, for the JetKVM verb: `run-command` relies on the MARKER LINE
+            the shell echoes (never a prompt glyph — tesseract does not OCR `~`);
+            do not author `prompt_anchors` on a glyph the OCR cannot read.
 
             ## Cross-References
 
