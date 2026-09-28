@@ -1,7 +1,5 @@
-version: 2026.261.1747
 charly-check:
     candy:
-        version: 2026.218.1200
         description: |-
             Concept candy owning the charly-check evaluation skills (check orchestration + the probe verbs). Owns its family's `skill:` kind entities (sibling nodes in this file) — the
             the plugins→candies migration; candy/plugin-marketplace regenerates the marketplace
