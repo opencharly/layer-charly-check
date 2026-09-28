@@ -1576,22 +1576,20 @@ check-skill:
             steps + 43 downstream failures where the full `check run` had reached 6/7 steps
             green incl. every mutating install.)
 
-            ### Host orchestration in a bed — a `check:` step, NOT a composed candy's `run:`
+            ### Host orchestration in a bed — author it in the bed's own `check:` step
 
-            A bed sometimes has to mutate the HOST (build a VM, bake a disk, push an image):
-            start a scratch registry, run `charly vm …`, etc. Three facts decide the shape,
-            and getting them wrong is the common trap:
+            A bed sometimes has to mutate the HOST (build a VM, bake a disk, push an image).
+            Author that in the bed's OWN `check:` step with `context: [runtime]`:
 
-            - **A bed's own `run:` step is verify-only (skipped).** So the host mutation
-              cannot live in the bed's `plan:` as a `run:`.
-            - **A COMPOSED CANDY's `run:` step does NOT resolve `${CHARLY_BIN}`.** The
-              install-plan lowering that executes a candy's `run:` steps does not stamp the
-              active binary (unlike the check-var resolver a bed's own `check:` step uses),
-              so `${CHARLY_BIN}` expands EMPTY and the step dies `command not found`. A
-              composed candy therefore cannot drive the host with the active charly.
-            - **A bed's own `check:` step DOES resolve `${CHARLY_BIN}`** — and it is executed
-              by the runner on the venue (a `host: local` bed runs it on the host). This is
-              the ONE place to author host orchestration.
+            - **A bed's own `run:` step is verify-only (skipped)** — so the mutation cannot
+              live in the bed's `plan:` as a `run:`.
+            - **The bed's `check:` step IS where the active binary is available.** The runner
+              executes a bed's `check:` step on the VENUE (a `host: local` bed → the host),
+              and the RUNTIME check-var resolver stamps `${CHARLY_BIN}` with the active binary
+              (the check-var-resolver contract — `sdk/kit` `NewRuntimeCheckVarResolver` /
+              `StampCharlyBin`, whose own doc names the check runtime AND the local deploy's
+              `--verify` plan run). So `${CHARLY_BIN}` drives the binary under test, not a
+              stale PATH selection. This is the ONE place to author host orchestration.
 
               ```yaml
               # a host: local bed whose check: step drives the host through the active binary
