@@ -480,7 +480,7 @@ android-skill:
             - `deploykit.ApkInstallStep` (`sdk/deploykit/steps.go`); `sdk/deploykit/install_build.go` —
               `compileApkStep` (the plugin-side preresolver reads this step; no deploy target executes it).
             - `sdk/loaderkit/load_unified.go` — loader wiring (mirrors every `kubernetes` site; the former `charly/unified.go` is DELETED, K-wave 2).
-            - `spec.Deploy` (the deploy node — the former `charly/deploy.go`'s `DeployNode` is DELETED, K-wave 2) with `target: android`; `charly/fleet_add_cmd.go` dispatch +
+            - `spec.Deploy` (the deploy node — the former `charly/deploy.go`'s `DeployNode` is DELETED, K-wave 2) with `target: android`; `charly/deploy_add_cmd.go` dispatch +
               `--node-only`; `sdk/deploykit/deploy_chain.go` / `charly/deploy_tree.go` passthrough.
 
             ## Related skills
@@ -2964,7 +2964,7 @@ check-skill:
                     position: a step in the `plan:` of member `M` runs on `M` (bare name), a step in the
                     `plan:` of a nested child `C` of parent path `P` runs on `P.C` (dotted). There is no authored
                     `on:`/`pod:` step field — both are retired; tree position is the sole source of
-                    venue (`flattenFleetVenues` stamps it at load time). A `cdp:`/`vnc:`/`mcp:` step
+                    venue (`FlattenVenuesByPosition` stamps it at load time). A `cdp:`/`vnc:`/`mcp:` step
                     placed under a driver member connects to that member's CDP/VNC/MCP endpoint; a
                     `command:` step runs in that member's venue. Members are brought up by the same
                     deploy verbs and are never check-live'd (instruments, not subjects). A GROUP
