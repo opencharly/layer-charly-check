@@ -21,7 +21,8 @@ charly-check:
               command: |
                 f=charly.yml
                 [ -f "$f" ] || f="$(git rev-parse --show-toplevel 2>/dev/null)/charly.yml"
-                /^[a-z0-9-]+-skill:[[:space:]]*$/ {
+                awk '
+                  /^[a-z0-9-]+-skill:[[:space:]]*$/ {
                   if (name != "" && !(has_trig[name] && has_item[name])) {
                     print (has_trig[name] ? "EMPTY triggers: " : "MISSING triggers: ") name; bad = 1
                   }
