@@ -1,0 +1,5 @@
+# `charly check` artifacts under <project>/.check/<recipe>/ — per-machine, per-run state that lives
+# IN the project tree (so a bed's durable result files stay with the checkout) and must stay OUT of
+# git history. This repo's root charly.yml declares disposable beds, so a bed run writes here with
+# nothing else ignoring it (opencharly/opencharly#455). The same pattern as charly's own .gitignore.
+.check/
