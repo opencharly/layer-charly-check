@@ -319,7 +319,7 @@ android-skill:
             and `appium:` (`/charly-check:appium`) declarative check verbs drive a running
             device; `kind: android` + `target: android` declaratively describe a device and
             the apps installed on it. The install machinery is shared — see "One installer
-            (R3)".
+            (R2)".
 
             ## `kind: android` — the device
 
@@ -423,7 +423,7 @@ android-skill:
             afterwards by dotted path; `charly check run <bed>` automates this (deploy pod →
             config → start → deploy nested children → check-live).
 
-            ## One installer + one plugin (R3 / F1)
+            ## One installer + one plugin (R2 / F1)
 
             candy/plugin-adb owns ALL Android device interaction — the `adb:` check verb,
             the `deploy:android` substrate, AND the goadb-backed `charly status` probe — so
@@ -1753,7 +1753,7 @@ check-skill:
 
                   | Stage | Who | Command | What |
                   |---|---|---|---|
-                  | **Specify** | you / an agent | hand-edit the candy's `plan:` list (or `charly box set candy.<name>.plan ...`) | Author the `description:` string + `plan:` steps on the CANDY that provides the behaviour (it bakes into every box that composes the candy — R3). |
+                  | **Specify** | you / an agent | hand-edit the candy's `plan:` list (or `charly box set candy.<name>.plan ...`) | Author the `description:` string + `plan:` steps on the CANDY that provides the behaviour (it bakes into every box that composes the candy — R2). |
                   | **Bind** | author (implicit) | `charly feature pending <entity>` lists the agent-graded steps | Use a `check:` step (inline verb) → deterministic; use an `agent-check:` step (prose) → agent-graded. |
                   | **Run** | you / CI | `charly box feature run <image>` / `charly check feature run <deployment>` | Execute the plan; per-step pass/fail + grader evidence. |
                   | **Iterate** | you / an agent | edit + re-run, OR `charly check run <bed>` (an `iterate:` bed) | Drive red→green by hand, or let the plateau-bounded AI loop write the code until the `check:` steps pass. |
@@ -1843,7 +1843,7 @@ check-skill:
                   core code), and `sdk/deploykit/description_collect.go` (`CollectDescriptions`; the former `charly/description_collect.go` is DELETED, K-wave 2) for the `charly feature
                   list/pending/validate` surface. The `Runner.Grader` dispatch is `kit.RunPlan` (`sdk/kit/planrun.go`)
                   directly — the former 1-line `charly/description_run.go` wrapper was dissolved in P12a.
-                  Target resolution is shared with the harness loop and `charly check box`/`live` (R3).
+                  Target resolution is shared with the harness loop and `charly check box`/`live` (R2).
 
                   ## Authoring Gotchas (learned the hard way)
 
@@ -2179,7 +2179,7 @@ check-skill:
                   The fix is authored, not code: `#Op` carries `timeout?: #Duration`, and
                   `ProbeNeverHang` honours a longer authored value over the floor (the
                   effective ceiling becomes `declared + 30s`). Declaring it is USING the
-                  mechanism's own parameter — not an R4 workaround:
+                  mechanism's own parameter — not an R3 workaround:
 
                   ```yaml
                   - check: dnf install charly installs the package
@@ -2489,7 +2489,7 @@ check-skill:
                   harness-tracked background task** (`run_in_background`) — never foreground (the
                   Bash tool's `timeout`, 120s default / 600s max, kills the call mid-`vm-create`,
                   orphaning the domain) and
-                  never a sleep/poll loop (the R4 bandaid). (2) **Let the completion notification
+                  never a sleep/poll loop (the R3 bandaid). (2) **Let the completion notification
                   drive the next step** — the harness re-invokes the launching session when the run
                   exits, so the launcher must survive to completion to be notified: the persistent
                   main session does; an ephemeral sub-agent (returns synchronously) and an idle
@@ -2676,7 +2676,7 @@ check-skill:
 
                   **Which verb/bed proves what (the project rulebook R7):** `charly check box` passes on
                   zero-content stages too — it is not a substitute for the generated-artifact
-                  checks (R8). For the R10 gate, pick the disposable bed whose kind matches
+                  checks (R7). For the R10 gate, pick the disposable bed whose kind matches
                   what you changed (`check-pod` for the combined box/candy/pod/deploy-target
                   mechanism, `check-local`, `check-k3s-vm`, or a feature bed). `charly check run`
                   on an `iterate:` bed is the multi-hour AI-iteration benchmark, never a quick
@@ -2771,8 +2771,8 @@ check-skill:
                   0. **Prove every high-risk assumption before you edit (RDD — Risk Driven Development)** — the proactive bookend to Standard 11's fresh-rebuild gate. Low-risk orientation ("what does layer X do") is a skill lookup (R0, zero risk); every high-risk assumption — including any a skill or the code merely *asserts*, and above all whether this layer composition at its latest available versions builds / deploys / runs together — is proven on a `disposable: true` bed first (`charly check` it). Never accept docs or code as ground truth for a high-risk decision; if the bed disagrees with a skill, the skill is stale — fix it. Standard 0 (validate forward, riskiest-first) and Standard 11 (re-verify on a fresh rebuild) are the two ends of the same loop.
 
                   1. **Build a real artifact** (R7) — `charly box build <image>` / `go build` / `charly vm build <vm>`. Not just `go test`. Not just `charly box generate`.
-                  2. **Verify the emitted artifact's content** (R8) — `grep -c supervisord-conf .build/<image>/Containerfile` for any image that uses supervisord; `charly check libvirt domain-xml <vm>` for a VM.
-                  3. **Verify critical OCI / capability labels post-build** (R8) — `charly box labels <ref> --format init` (or any `ai.opencharly.<key>` shorthand) prints the built ref's label and exits non-zero when absent; `charly box labels <ref>` lists the whole capability contract (`/charly-internals:capabilities`). Empty / missing label → the detection path silently returned nil → regression.
+                  2. **Verify the emitted artifact's content** (R7) — `grep -c supervisord-conf .build/<image>/Containerfile` for any image that uses supervisord; `charly check libvirt domain-xml <vm>` for a VM.
+                  3. **Verify critical OCI / capability labels post-build** (R7) — `charly box labels <ref> --format init` (or any `ai.opencharly.<key>` shorthand) prints the built ref's label and exits non-zero when absent; `charly box labels <ref>` lists the whole capability contract (`/charly-internals:capabilities`). Empty / missing label → the detection path silently returned nil → regression.
                   4. **Deploy to a disposable target** (R10) — never experiment on a resource that doesn't carry `disposable: true`. If no suitable disposable target exists, create one first (`charly deploy add <name> <ref> --disposable` or mark a VM `disposable: true` in `charly.yml` and `charly vm create`). The setup is part of the task. On a disposable target: `charly update <name>` (unattended). On anything else: confirm with the user before any irreversible destroy — except preempting a declared-`preemptible:` holder, which is standing-authorized (reversible: graceful stop + guaranteed restore).
                   5. **Target must reach steady-state** — `charly status <image>` → `running`; `charly check libvirt info <vm>` → state `running`; SPICE socket file exists and accepts a handshake. If the service start-limit is hit, the container is crashing — read `charly logs <image>` and reproduce in a disposable shell (`charly shell <image>`, running the service command manually).
                   6. **Run the declarative test suite** — `charly check live <image>` full three-section pass against the live container (or `--uri` / `--host` remote equivalent for a remote target).
@@ -5392,7 +5392,7 @@ jetkvm-skill:
             pays it once.
 
             The recipe is DATA, supplied by a `kind: jetkvm` device entity — the plugin is
-            installer-agnostic (R3), so one plugin drives any text console. Example:
+            installer-agnostic (R2), so one plugin drives any text console. Example:
 
             ```yaml
             omarchy-kvm:
@@ -5644,7 +5644,7 @@ console-skill:
             SUBSTRING — passes the instant the command is typed, BEFORE it runs, certifying
             completion that never happened. So the engine types `command; echo <opaque-marker>`
             and waits for a screen LINE whose trimmed text EQUALS the marker: only the shell's
-            OWN output produces that. It is a condition poll, never a sleep (R4).
+            OWN output produces that. It is a condition poll, never a sleep (R3).
 
             ## luks-unlock — the encrypted-install first boot
 
@@ -5668,7 +5668,7 @@ console-skill:
               node id; the OBSERVED outcome selects the branch. No transition → `next:`.
             - **while loop** — a transition pointing BACK to an earlier node is a loop, bounded
               by `flow_max_loops` (per node) and `flow_max_steps` (whole flow). A condition
-              that never becomes true FAILS naming `max_loops` — the R4-safe "repeat until".
+              that never becomes true FAILS naming `max_loops` — the R3-safe "repeat until".
 
             A node action may be a raw input (`key`/`combo`/`text`) or a shell `command:`
             (run in the open terminal, output OCR-read). The flow validates WITHOUT a device.
