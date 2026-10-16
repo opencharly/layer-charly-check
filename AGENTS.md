@@ -3,15 +3,19 @@
 Standalone candy repo for the `charly-check` concept candy — it ships no install
 content and owns the `check` family of `skill:` entities that document charly's
 evaluation surface and probe verbs. The entities live in `charly.yml` at the
-repo root; `candy/plugin-marketplace` regenerates the standalone
-opencharly/marketplace corpus from them.
+repo root and each skill's BODY lives beside it, in `.agents/skills/<name>/SKILL.md`;
+`candy/plugin-marketplace` regenerates the standalone opencharly/marketplace
+corpus from them.
 
 Canonical files:
 
-- `charly.yml` — the `charly-check:` concept candy entity plus 14 `skill:`
-  entities (`check`, `adb`, `android`, `appium`, `cdp`, `check-sway-browser-vnc`,
+- `charly.yml` — the `charly-check:` concept candy entity plus 14 `skill:` routing
+  nodes (`check`, `adb`, `android`, `appium`, `cdp`, `check-sway-browser-vnc`,
   `dbus`, `libvirt`, `record`, `spice`, `vnc`, `jetkvm`, `console-automation`,
-  `cua`).
+  `cua`), each carrying `name`/`family`/`owner`/`triggers` and no body.
+- `.agents/skills/<name>/SKILL.md` — the 14 skill BODIES, one directory per node's
+  `name:`, plus `references/*.md` where a body splits (the `check` skill's four).
+  The files are the source of record for the prose.
 - `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.
 - `README.md` — user overview only; never agent guidance.
 
@@ -37,9 +41,10 @@ Canonical files:
 
 ## Modify this repo
 
-- The `skill:` entities are the projected usage source. Edit them here, never the
-  generated `SKILL.md` in the marketplace corpus; a corpus regeneration
-  (`charly marketplace generate`) projects them.
+- Edit a skill's `SKILL.md` under `.agents/skills/<name>/` for the prose, or its
+  node in `charly.yml` for the routing — never the generated `SKILL.md` in the
+  marketplace corpus; a corpus regeneration (`charly marketplace generate`)
+  projects both.
 - When a check verb's behaviour or a bed's roster changes, update the matching
   `skill:` entity in the same change so the corpus does not drift.
 - Keep the concept candy's `plan:` no-op; it exists only to carry the entities.
