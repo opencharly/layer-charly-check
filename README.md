@@ -23,9 +23,10 @@ corpus from these entities, so the skills are authored here and projected there.
 
 ## How to use it
 
-This repo is consumed as a **skill source**, not as an image layer. Edit the
-`skill:` entities in `charly.yml`; the marketplace regeneration projects them
-into `/charly-check:*` pages. To reference the repo directly:
+This repo is consumed as a **skill source**, not as an image layer. Edit a
+skill's file under `.agents/skills/<name>/` (or its node's routing metadata in
+`charly.yml`); the marketplace regeneration projects them into
+`/charly-check:*` pages. To reference the repo directly:
 
 ```yaml
 my-box:
@@ -37,10 +38,11 @@ my-box:
 
 ## Layout
 
-- `charly.yml` — the `charly-check:` concept candy entity plus 14 `skill:`
-  entities (`check`, `adb`, `android`, `appium`, `cdp`, `check-sway-browser-vnc`,
-  `dbus`, `libvirt`, `record`, `spice`, `vnc`, `jetkvm`, `console-automation`,
-  `cua`).
+- `charly.yml` — the `charly-check:` concept candy entity plus 14 `skill:` nodes
+  (`check`, `adb`, `android`, `appium`, `cdp`, `check-sway-browser-vnc`, `dbus`,
+  `libvirt`, `record`, `spice`, `vnc`, `jetkvm`, `console-automation`, `cua`).
+- `.agents/skills/<name>/SKILL.md` — the skill bodies, one directory per node's
+  `name:`.
 - `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.
 - `README.md` — this user overview.
 
