@@ -1,0 +1,223 @@
+---
+name: check
+description: Every `charly check` mode, candy or box plan authoring, disposable test
+  beds, R10 runs, agent grading, baked plan labels, or check operation. Covers image/live/run,
+  the plugin-provided live probe verbs, deterministic verb catalog, runtime variables,
+  overlays, plan inclusion, cross-deployment probing.
+---
+
+# Check — unified declarative + AI-iteration evaluation
+
+## Bed & entity naming — dot-free, always
+
+Deploy-tree keys and entity names must be DOT-FREE: an entity named
+`check-mise-26.04` breaks the deploy-tree keying (the dot reads as a
+namespace separator) — keep dots out of every `check-*` entity name
+(e.g. `check-mise-ubuntu-2604`, not `…-26.04`).
+
+## Overview
+
+`charly` ships a goss-inspired declarative testing framework built into the
+CLI. Plan steps — each one intent keyword (`run:`/`check:`/`agent-run:`/
+`agent-check:`/`include:`) carrying prose, plus at most one verb-position key for
+`run:`/`check:` — are authored as an ordered unnamed list under `plan:` inside a
+`candy:` entity (layer or image) in `charly.yml`; an optional `id:` names a step.
+They are baked into the `ai.opencharly.description` OCI label
+(`LabelDescriptionSet`, which carries the collected plan steps with
+`candy:`/`box:`/`deploy` origin annotations) so any pulled image is self-testable
+without its source repo. A local `charly.yml` overlay can add steps or override
+baked ones by `id:`. The runner resolves deploy-time variables (actual host port
+mappings, volume backings, env vars, container IP, DNS) at execution time, so a
+check written once works unchanged when `charly.yml` remaps ports.
+
+The surface is three orthogonal verbs: **`charly check box <image>`** evaluates
+the built image artifact in an isolated disposable container (build-context
+`check:` steps only); **`charly check live <name>`** evaluates a running
+deployment (deploy-context steps too, with full runtime-variable resolution);
+**`charly check run <bed>`** runs a `disposable: true` R10 deploy end to end —
+or, when the bed carries an `iterate:` block, drives an AI runner through
+plateau-bounded iterations instead. Mode is explicit in the verb; there is no
+autodetect. Full detail: `references/beds-and-r10.md`.
+
+## MODE DISCIPLINE — `check live` is VERIFY-ONLY, never an R10 gate (R1 2026-09-07)
+
+**`charly check live <name>` runs in verify-only mode: every MUTATING `run:` step
+(install, session-create, launch, delete, config writes) is SKIPPED by design**
+(`verify_checks.go` threads `in.VerifyOnly`; the live path sets it; the log prints
+`skipped — verify-only mode (mutating step)`). A live check proves the CURRENT
+state of a running deployment - it CANNOT create the state its check steps
+depend on. An appium/`vnc:`/`adb:` session instrument whose bracket is a
+`session-create` run step will therefore fail EVERY downstream find/assert step
+with "no Appium session ... author an `appium: session-create` step first".
+
+**The R10 gate is ALWAYS `charly check run <bed>`** (build -> check image -> deploy
+-> check live -> fresh update -> teardown on a `disposable: true` deploy), where
+mutating steps EXECUTE in order. NEVER substitute `charly check live` for the R10
+gate "to save time" against a still-up deployment: verify-only output with skipped
+mutating steps is NOT evidence of the instrument/session path and must never be
+pasted as a gate. If a worker picks a mode other than `check run` for an R10
+proof, that is an R1 violation: STOP, read the mode semantics above, re-run the
+full mode. (Measured: a `check live` substitution produced 26 skipped mutating
+steps + 43 downstream failures where the full `check run` had reached 6/7 steps
+green incl. every mutating install.)
+
+### Host orchestration in a bed — author it in the bed's own `check:` step
+
+A bed sometimes has to mutate the HOST (build a VM, bake a disk, push an image).
+Author that in the bed's OWN `check:` step with `context: [runtime]`:
+
+- **A bed's own `run:` step is verify-only (skipped)** — so the mutation cannot
+  live in the bed's `plan:` as a `run:`.
+- **The bed's `check:` step IS where the active binary is available.** The runner
+  executes a bed's `check:` step on the VENUE (a `host: local` bed → the host),
+  and the RUNTIME check-var resolver stamps `${CHARLY_BIN}` with the active binary
+  (the check-var-resolver contract — `sdk/kit` `NewRuntimeCheckVarResolver` /
+  `StampCharlyBin`, whose own doc names the check runtime AND the local deploy's
+  `--verify` plan run). So `${CHARLY_BIN}` drives the binary under test, not a
+  stale PATH selection. This is the ONE place to author host orchestration.
+
+  ```yaml
+  # a host: local bed whose check: step drives the host through the active binary
+  my-produce-bed:
+    local: { from: my-app, host: local, disposable: true }
+    plan:
+      - check: build + bake a VM and push its containerDisk
+        id: produce
+        context: [runtime]
+        timeout: 3600s   # REQUIRED for a long step (see below)
+        command:
+          command: |
+            set -eu
+            ${CHARLY_BIN} vm create my-base-vm --domain my-produce
+            ${CHARLY_BIN} vm bake my-base-vm --from-snapshot golden --domain my-produce --container-disk --push localhost:5099/img:1
+          in_container: false
+  ```
+
+- **`timeout:` is MANDATORY for any step longer than the never-hang ceiling
+  (~120s).** A host-orchestration step (a VM build/bake) far exceeds it; without
+  an explicit `timeout:` the probe is killed mid-run (`probe killed by never-hang
+  ceiling`) and the bed fails. Set it generously (e.g. `3600s`).
+- **The step runs at BOTH `deploy-add` AND `check-live`, so it MUST be
+  idempotent** (reuse a running registry, capture a golden only once, tolerate a
+  pre-existing domain). Guard each sub-action on its own precondition.
+- **Destroy only a `disposable: true` DEPLOY's domain.** Key the created/destroyed
+  VMs to a per-run `vm:` deploy (`--domain my-produce`) declared `disposable:
+  true` — never the shared `kind: vm` entity. See `/charly-vm:vm` "Disposability".
+
+Agent Driven Evaluation (ADE) runs an entity's own baked plan as acceptance
+tests: a `check:` step's inline verb is graded deterministically, while an
+`agent-check:` step (prose only) is graded by an AI agent via `charly box/check
+feature run`. Every candy MUST ship a non-empty `description:` + at least one
+deterministic `check:` step (`charly box validate` enforces it); the live agent
+grader stays opt-in. Full detail: `references/authoring-gotchas.md`.
+
+## The three-step bed shape — a gate that can FAIL without the change
+
+*This is the shape every `check:` bed the R10 gate selects should have, and the one this org's best beds use.*
+
+**A bed that only inspects the FINAL state cannot tell "my change worked" from "something else made it true" — and
+cannot fail without the change, which is R7's real test.** The shape that can:
+
+1. **ASSERT THE ABSENCE — before the change.** *Probe the thing your change will produce, and assert it is NOT there
+   yet: `nothing-served-before-the-delivery`. If the probe already succeeds on the un-changed tree, the bed proves
+   nothing about your change.*
+2. **PERFORM THE CHANGE.** *The `run:` step, or the deploy the bed exists to exercise.*
+3. **ASSERT THE PRESENCE — after it, in terms ONLY the change could produce.** *`delivers-the-built-tree`,
+   `venue-serves-the-delivered-word`.* **The assertion must be specific enough that a coincidence does not satisfy it.**
+
+**A working example in this org:** `spec#245`'s `check-spec-delivery` bed, whose three steps are named exactly along this
+shape. *Six PRs in one leg failed by omitting step 1.* **If you cannot write step 1, you have not decided what your change
+produces — which is worth knowing before the gate runs, not after.**
+
+## The uppercase-token trap — a step that SKIPS is not a step that PASSES
+
+**A step's body is scanned for variables INCLUDING ITS COMMENTS, and an unresolvable UPPER-CASE token makes the step
+SKIP rather than fail.** This is the single most expensive authoring trap in the check system, because a skipped step
+reads as a satisfied one in the summary.
+
+**So:**
+- **do not put an upper-case `${...}`-looking token in a step's body or in a comment inside it**, even to explain
+  something. *A comment is scanned.*
+- **verify the step table says `PASS`, not `SKIP`**, after a run that you are quoting as evidence. `2 steps: 2 passed,
+  0 skipped` is the line to look for; a bed that reports skips has not proven what you are claiming it proved.
+- **when a variable genuinely is needed, use the bed's declared `var:` mechanism** so the value is resolvable at the
+  point the step runs.
+## Quick Reference
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Pure-box check (disposable, build-context) | `charly check box <image>` | Candy + box sections only, in `podman run --rm` (no host port mappings, no volumes attached) |
+| Live full-stack check (running deployment) | `charly check live <name> [-i instance]` | All three sections run via `podman exec` / SSH / nested chain, with full runtime variable resolution |
+| R10 bed (full sequence) | `charly check run <bed>` | Build → check image → deploy → check live → fresh update → tear down on a `disposable: true` deploy (ONE bed per invocation). Canonical R10 gate; for a whole roster declare a `kind:check-roster` entity and run it with `charly check run <roster>` (bounded `lanes`, exclusive-token serial chains, host-local refusal) |
+| AI iteration loop | `charly check run <bed>` | Drives an AI through plateau-bounded iterations against a bed carrying an `iterate:` block |
+| Validate authored tests at config time | `charly box validate` | Schema, context/variable consistency, id uniqueness |
+| Inspect effective spec | `charly box inspect <image>` | JSON includes merged check structure |
+| Filter by verb | `charly check live <name> --filter file --filter port` | Repeatable |
+| Filter by section | `charly check live <name> --section deploy` | One of: candy / box / deploy |
+| Output format | `charly check live <name> --format json\|tap\|text` | Default text |
+
+## Reference index
+
+Detail lives in sibling `references/*.md` files, loaded on demand:
+
+| Topic | Reference | Covers |
+|---|---|---|
+| Disposable beds, R10 acceptance gate | `references/beds-and-r10.md` | The bed roster, the "R10 gate by change class" matrix (sole owner), the 11 Testing Standards, "Flag discipline" (sole owner), exit codes, the three primary modes, wall-clock/timing data |
+| Deterministic verb catalog | `references/verb-catalog.md` | The `plan:` authoring model, the file/package/service/port/process/command/http/... verb catalog, shared modifiers, matcher forms, verb routing (executor selection), runtime variables, `charly.yml` overlay rules |
+| Live-container probe verbs | `references/live-probe-verbs.md` | The out-of-process `cdp`/`wl`/`dbus`/`vnc`/`mcp` verbs — method allowlists, worked examples, artifact-validation modifiers |
+| Authoring gotchas, ADE, AI harness | `references/authoring-gotchas.md` | Agent Driven Evaluation (the six-stage loop, the agent-grader contract), the 12 numbered authoring gotchas, the AI-iteration harness pgrep-deadlock defense |
+| Cross-deployment probing | `references/cross-deployment-probing.md` | Image preflight (host-target runs), venue-from-position members, `${HOST:...}` addressing, the pod→pod and host→pod/VM worked examples |
+
+## Related skills
+
+- **Live-container probe verbs — ALL out-of-process** — the `wl:` Wayland verb (`/charly-check:wl`), the `cdp:` Chrome-DevTools verb (`/charly-check:cdp`), the `vnc:` VNC-framebuffer verb (`/charly-check:vnc`), the `dbus:` D-Bus verb (`/charly-check:dbus`), the `mcp:` MCP-protocol verb (`/charly-build:charly-mcp-cmd`), the `record:` recording verb (`/charly-check:record`), the `kube:` cluster-probe verb (`/charly-kubernetes:check-k8s`), the `adb:` ADB verb (`/charly-check:adb`), the `appium:` Android-UI verb (`/charly-check:appium`), the `spice:` SPICE-wire verb (`/charly-check:spice`), and the `libvirt:` VM-probe verb (`/charly-check:libvirt`) are NOT host `charly check` subcommands — each is a declarative check verb served out-of-process by its plugin (`candy/plugin-wl`, `candy/plugin-cdp`, `candy/plugin-vnc`, `candy/plugin-dbus`, `candy/plugin-mcp`, `candy/plugin-record`, `candy/plugin-kube`, `candy/plugin-adb`, `candy/plugin-appium`, `candy/plugin-spice`, `candy/plugin-vm`). See `references/live-probe-verbs.md`.
+- `/charly-image:layer` — layer authoring; the ordered `plan:` step list is part of every `charly.yml`.
+- `/charly-image:image` — image-level plan steps at composition time.
+- `/charly-core:deploy` — local `charly.yml` overlay rules and the plan-step merge.
+- `/charly-build:validate` — static schema + cross-scope variable checks; the first
+  gate before `charly box build`.
+- `/charly-build:build` — how check entries are embedded into the OCI label at build
+  time; LABELs-at-end cache behavior.
+- `/charly-build:inspect` — view the merged plan / description structure as JSON.
+- `/charly-build:migrate` — `charly migrate` brings legacy configs up to the
+  current schema (one flat ordered `plan:` list per entity).
+- `/charly-internals:go` — implementation map. Core keeps the check-harness
+  host seams + verb-catalog semantics: `checkspec.go` (`opActsInBuildDeploy`),
+  `planrun_adapter.go` (the op-context grammar `opEffectiveContexts`/`opInContext`
+  + `hostVerbResolver`/`hostCheckCarrier`), `checkrun.go` (verdict helpers +
+  committed-APK anchoring data), `checkrun_charly_verbs.go`,
+  `check_endpoint_resolve.go`, `check_graphics_endpoint.go`, `checkrun_act.go`,
+  `check_venue_resolve.go`, `provider_checkenv.go`, the `host_build_check_*.go`
+  check seams (`host_build_check_load_plugins.go`, `host_build_check_bed_gpu_prereq.go`),
+  plus the `LabelDescriptionSet` type in `labels.go`. The
+  op-level check validation (`validateOps` / `validateCheck`) moved out of core
+  to `candy/plugin-box/validate_check.go`. The
+  `charly check` CLI + AI-iteration harness (the management Cmds, the iteration
+  loop, the watchdog, clone/note/synccreds/runlocal) + EVERY check-run mode body
+  (box/live/feature-live/feature-box/score/preflight) live in the compiled-in
+  `command:check` plugin `candy/plugin-check/` (the former "check-run" HostBuild
+  seam is DELETED, K-wave 2 cone R4).
+- `/charly-internals:generate-source` — how `LabelDescriptionSet` is written into the Containerfile
+  via `writeJSONLabel`, and why the LABEL block lives at the end of the
+  final stage.
+- `/charly-internals:capabilities` — the `ai.opencharly.description` label (`LabelDescriptionSet`) carrying the baked plan is
+  part of the same capability contract as `LabelService`.
+- `/charly-internals:agents` — the sub-agents (`check-bed-runner`,
+  `deploy-verifier`) and dynamic workflows (`/audit-deploy-configs`) that
+  drive these beds, and the R10/disposable/
+  paste-proof rules that bind any agent or workflow running `charly check run`.
+- `/charly-internals:plugin` — a `check:` step's `<word>: <input>` verb sugar dispatches
+  to a plugin-provided verb (built-in or out-of-tree); the desugared internal input is
+  validated at runtime against the plugin's served CUE schema before `runPluginVerb`
+  invokes it.
+
+## When to Use This Skill
+
+**MUST be invoked** before authoring, running, or debugging check
+behavior at any level. Triggers: `charly check` (any subcommand), `charly check
+run`, `charly check box`, `charly check live`, the plan steps / `description:`
+field in a candy/box `charly.yml`, the disposable test-bed deploys, the
+`ai.opencharly.description` OCI label, `kind: agent` (the agent grader) or a
+`disposable: true` deploy (+ its `iterate:` block),
+`charly check run <bed>` / `charly check run <roster>` (disposable R10 deploys; a whole roster is a `kind:check-roster` entity), or any check
+verb by name (file/port/http/command/package/service/cdp/wl/dbus/vnc/mcp/...).
