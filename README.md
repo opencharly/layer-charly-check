@@ -5,11 +5,11 @@ The `charly-check` family — the check orchestration and probe-verb skills.
 The `charly-check` candy is a **concept candy**: it ships no install content and
 owns the `check` family of `skill:` entities that document charly's evaluation
 surface — `check` (orchestration, plans, disposable beds, R10) and the
-out-of-process probe verbs `adb`, `android`, `appium`, `cdp`, `dbus`, `libvirt`,
-`record`, `spice`, `vnc`, `jetkvm`, `console-automation`, `cua`, and the
-`check-sway-browser-vnc` bed. `candy/plugin-marketplace` regenerates the
-standalone [opencharly/marketplace](https://github.com/opencharly/marketplace)
-corpus from these entities, so the skills are authored here and projected there.
+out-of-process probe verbs `cdp`, `dbus`, `libvirt`, `record`, `spice`, `vnc`,
+`console-automation`, `cua`, and the `check-sway-browser-vnc` bed.
+`candy/plugin-marketplace` regenerates the standalone
+[opencharly/marketplace](https://github.com/opencharly/marketplace) corpus from
+these entities, so the skills are authored here and projected there.
 
 ## What it provides
 
@@ -17,7 +17,7 @@ corpus from these entities, so the skills are authored here and projected there.
 |---|---|
 | Layer / candy | `charly-check` (concept candy) |
 | Install content | none — a `true` no-op `plan:` |
-| Owns | 14 `skill:` entities in the `check` family |
+| Owns | 10 `skill:` entities in the `check` family |
 | Projected to | `marketplace/check/skills/` |
 | Service / port | none |
 
@@ -38,9 +38,9 @@ my-box:
 
 ## Layout
 
-- `charly.yml` — the `charly-check:` concept candy entity plus 14 `skill:` nodes
-  (`check`, `adb`, `android`, `appium`, `cdp`, `check-sway-browser-vnc`, `dbus`,
-  `libvirt`, `record`, `spice`, `vnc`, `jetkvm`, `console-automation`, `cua`).
+- `charly.yml` — the `charly-check:` concept candy entity plus 10 `skill:` nodes
+  (`check`, `cdp`, `check-sway-browser-vnc`, `dbus`, `libvirt`, `record`, `spice`,
+  `vnc`, `console-automation`, `cua`).
 - `.agents/skills/<name>/SKILL.md` — the skill bodies, one directory per node's
   `name:`.
 - `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.

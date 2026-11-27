@@ -39,27 +39,6 @@ charly-check:
                 }
                 ' "$f"
 
-adb-skill:
-    skill:
-        name: adb
-        family: check
-        owner: charly-check
-        triggers:
-            - "the `adb:` check verb / Android Debug Bridge probing from a candy/box plan (out-of-process plugin; devices, shell, install, getprop, screencap, logcat, wait-for-device)"
-android-skill:
-    skill:
-        name: android
-        family: check
-        owner: charly-check
-        triggers:
-            - "`kind: android` device / `target: android` deploy / `apk:` package format in candies / installing Android apps declaratively / remote-or-emulator adb endpoint / nested `pod \u2192 android`"
-appium-skill:
-    skill:
-        name: appium
-        family: check
-        owner: charly-check
-        triggers:
-            - "the `appium:` check verb / Android UI automation (out-of-process plugin) / W3C WebDriver sessions, element introspection, the gesture/app/key/device sugar groups, the generic `execute`/`raw` escape hatch"
 cdp-skill:
     skill:
         name: cdp
@@ -75,9 +54,6 @@ check-skill:
         triggers:
             - "`charly check *` (ANY check verb, incl. `charly check box`) / `charly check run <bed>` (the disposable-deploy R10 bed) / authoring `disposable: true` check beds / `charly check live` / the probe verbs (cdp/wl/dbus/vnc/mcp/record/spice/libvirt) / `iterate:` AI-agent scoring / `plan:` step authoring / `charlycheck/*` branches"
             - "Agent Driven Evaluation (ADE) / `charly box feature run` / `charly check feature run` / `charly feature list/pending/validate` / authoring a candy's `plan:` + `description:` string / the agent grader for `agent-check:` steps"
-            - "the `adb:` check verb / Android Debug Bridge probing from a candy/box plan (out-of-process plugin; devices, shell, install, getprop, screencap, logcat, wait-for-device)"
-            - "the `jetkvm:` check verb / IP-KVM control from a candy/box plan (out-of-process plugin; status, screenshot, keyboard/mouse, power/ATX, virtual media, USB, device config)"
-            - "the `appium:` check verb / Android UI automation (out-of-process plugin) / W3C WebDriver sessions, element introspection, the gesture/app/key/device sugar groups, the generic `execute`/`raw` escape hatch"
             - "Verify a cutover by running the R10 beds (drive `charly check run <bed>`)"
             - "Evaluate/audit a deployment config (image or deploy, yours)"
         references:
@@ -743,7 +719,6 @@ check-skill:
                   | `check-pod` | pod | `image: check-pod` | combined mechanism bed: `candy:` image build + `candy:` layer composition order + `kind: pod` runtime (nc :18794 + supervisord) + every deploy-target rendering path |
                   | `check-jupyter-pod` / `check-jupyter-ml-pod` | pod | `image: jupyter` / `image: jupyter-ml` | jupyter-mcp regression coverage; jupyter-ml spacy/quarto + GPU MCP probes |
                   | `check-versa-pod` | pod | `image: versa` | versa OSM analytics + vector-tile + marimo MCP |
-                  | `check-android-emulator-pod` | pod | `image: android-emulator` | Android 14 emulator (/dev/kvm) + adb/appium |
                   | `check-cachyos-gpu-vm` / `check-selkies-labwc-nvidia-vm` / `check-selkies-kde-nvidia-vm` | vm | `from: cachyos-gpu-vm` | VFIO GPU-passthrough + nested selkies NVENC streaming (`requires_exclusive: [nvidia-gpu]` — serialized) |
                   | `check-arch-pacstrap-vm` / `check-arch-vm` / `check-cachyos-vm` / `check-debian-debootstrap-vm` / `check-ubuntu-debootstrap-vm` / `check-fedora-vm` | vm | `from: <distro>-vm` | the distro bootstrap-VM beds (pacstrap / debootstrap) |
                   | `check-cross-pod-cdp` / `check-cross-vm-http` / `check-cross-local-http` / `check-cross-local-driver` | pod/vm/local | — | cross-deployment probing (pod→pod, host→pod/VM) |
@@ -794,7 +769,7 @@ check-skill:
                   through each other's cluster. `disposable: true` is the sole authorization
                   for the unattended destroy+rebuild (see `/charly-internals:disposable`). Two
                   load-time guards back the beds: `validateCheckBeds` enforces the deploy's substrate
-                  kind ∈ {pod, vm, local, android}, a resolvable cross-ref, and `disposable: true`;
+                  kind ∈ {pod, vm, local}, a resolvable cross-ref, and `disposable: true`;
                   `foldCheckBeds` enforces the deploy's name is disjoint from every other deploy.
                   Neither checks host ports —
                   disjoint ports across beds are the author's responsibility (an overlap fails the
@@ -1060,7 +1035,7 @@ check-skill:
                   | **Harness project configuration** — `AGENTS.md`, `.codex/**`, repo-native `.agents/**`, or an executable that provisions or validates those surfaces | Parse the changed configuration; run the project profile and static-validator checks; verify exact gitlink and linked-worktree provenance | Run the final-tree repository harness gate: execute each changed validator/provisioner directly, verify only the gitlinks dispatched by the change class at their recorded revisions, and run the committed developer-profile checks. A Git-provisioning change also proves its canonical-object reference and exact-gitlink behavior in a dedicated linked worktree. Record the exact approved commands and active managed sandbox available for this run. This proves repository-controlled behavior; never claim that it proves settings loaded by a newly launched harness process. The fresh validator independently decides whether the final-tree delta additionally requires a Charly R10 bed and runs it when required. | `fully tested and validated` | A forced restart/new session, alternate home/cache/workspace, or unrelated VM/container roster that cannot exercise repository configuration |
                   | **`charly` Go code** | `go test ./...` + `go vet` + the R9 source build `scripts/bootstrap-charly.sh` (R9 freshness + `charly version` check on the worktree binary) | `charly check run <bed>` for EACH bed whose kind matches a touched code path: box/candy/pod/deploy-target mechanism → `check-pod`; `target: local` → `check-local`; VM / kubernetes → `check-k3s-vm`; a feature surface → its feature bed. Cross-cutting loader / resolver / IR / unified-schema changes → run the matching beds as one `kind:check-roster` roster (`charly check run <roster>`, its `lanes` pool overlapping every bed) — in-spec for that class, not a scope override; a roster run that does not include every matching bed is a partial roster, never a green gate | `fully tested and validated` | Beds whose substrate the change cannot reach |
                   | **Contract / library module** — a Go module with NO `main`/deployable target and therefore NO `disposable: true` entity (the `github.com/opencharly/spec` + `github.com/opencharly/sdk` contract modules; any standalone library repo). Shipping no `charly.yml` is NOT the discriminator: `spec` carries one holding only its `repo:`/`task:` maintenance manifest, and a task-only manifest is no bed venue | none beyond the suite | Run the repo's OWN committed module CI (`.github/workflows/ci.yml`: `go build ./...` + `go test ./...` + `gofmt -l .` + `golangci-lint run ./...`) GREEN on the PR head — the module suite IS the gate, because no bed CAN exist (a bed that cannot fail on the change proves nothing). The suite must genuinely EXECUTE the changed paths (a test that would FAIL without the change), not merely compile them. The `no disposable target` premise is a negative claim: prove it with executed output on the PR head — `git grep -nE '^[[:space:]]*disposable:' -- '*.yml' '*.yaml'` returns no match, and the root `charly.yml` is absent or declares no `box:`/`deploy:`/`check:` node. Key the grep to the ANCHORED key at line start: the bare string also sits in CHANGELOG prose and in Go string literals, and a bare `grep 'charly.yml'` also matches the `*.charly.yml.golden` `workflowkit` fixtures — either form makes the premise false-negative on `sdk`. A change whose behaviour is observable only at a CONSUMER's live boundary names the consumer PR running that bed — the bed rides the consumer change (producer→consumer order, B6), never the library PR | `fully tested and validated` | A `charly check run` bed in the module repo — none can exist there; the consumer boundary bed belongs to the consumer PR |
-                  | **Candy / box / pod / vm / kubernetes / local / android config** | `charly box validate` | Build + run a bed that composes the changed entity (a candy edit → a bed whose image stacks that candy); when no bed composes it, the R7 sequence on a disposable deploy: build → `charly check box` → deploy → `charly check live` → fresh `charly update` | `fully tested and validated` | Beds that do not compose the changed entity |
+                  | **Candy / box / pod / vm / kubernetes / local config** | `charly box validate` | Build + run a bed that composes the changed entity (a candy edit → a bed whose image stacks that candy); when no bed composes it, the R7 sequence on a disposable deploy: build → `charly check box` → deploy → `charly check live` → fresh `charly update` | `fully tested and validated` | Beds that do not compose the changed entity |
                   | **`iterate:` / ai check config** | `charly box validate` | The affected `iterate:` bed run as specified (see "Flag discipline") | `fully tested and validated` | Unrelated beds |
 
                   **Tier on a clean pass — the class fixes the gate; the gate fixes the tier.**
@@ -1891,7 +1866,7 @@ check-skill:
                   | `vnc` | `method` (primary: status/screenshot/click/mouse/type/key/rfb/passwd) + method-specific fields (`x`, `y`, `text`, `key`, `artifact`) | Deploy-context only. Dispatches out-of-process via `candy/plugin-vnc` (no host subcommand); the host pre-resolves the RFB endpoint for pod AND vm targets. See `references/live-probe-verbs.md`. |
                   | `mcp` | `method` (primary: ping/servers/list-tools/list-resources/list-prompts/call/read) + method-specific fields (`tool`, `uri`, `input`, `mcp_name`) | Deploy-context only. Speaks `github.com/modelcontextprotocol/go-sdk` to any `mcp_provide` endpoint. See `references/live-probe-verbs.md` "Method allowlist — mcp". |
 
-                  > **A step verb (or Op modifier) must never be spelled like a reserved kind word.** Kinds (`candy`, `pod`, `vm`, `kubernetes`, `local`, `android`, `group`, …) live only at a config edge — the opening discriminator of a top-level node or a tree-child node — never as a key in the middle of a step. A new probe verb that would collide with a kind word must pick a non-colliding spelling (the `k8s`/`group` probe verbs were renamed to `kube`/`unix_group` for exactly this reason). This is machine-enforced by `spec/spec` `TestNoKindWordAsStepVerb` + `TestNoKindWordAsOpModifier` — adding a colliding verb fails the build.
+                  > **A step verb (or Op modifier) must never be spelled like a reserved kind word.** Kinds (`candy`, `pod`, `vm`, `kubernetes`, `local`, `group`, …) live only at a config edge — the opening discriminator of a top-level node or a tree-child node — never as a key in the middle of a step. A new probe verb that would collide with a kind word must pick a non-colliding spelling (the `k8s`/`group` probe verbs were renamed to `kube`/`unix_group` for exactly this reason). This is machine-enforced by `spec/spec` `TestNoKindWordAsStepVerb` + `TestNoKindWordAsOpModifier` — adding a colliding verb fails the build.
 
                   ### Shared modifiers
 
@@ -1992,9 +1967,7 @@ check-skill:
                   the rest of the heredoc (the not-yet-run script lines, which would otherwise
                   truncate the check to its first command). Authors write plain multi-line
                   scripts; no per-call-site `</dev/null` is needed. Host-side `command:`
-                  (`in_container: false`) runs via `sh -c` argv and is unaffected. For Android UI
-                  readiness, prefer the typed `adb: wait-ui-settled` / `current-focus` / `keyevent`
-                  verbs (`/charly-check:adb`) over shell entirely.
+                  (`in_container: false`) runs via `sh -c` argv and is unaffected.
 
                   ## Runtime variables
 
@@ -2126,18 +2099,6 @@ vnc-skill:
         owner: charly-check
         triggers:
             - "the `vnc:` check verb / VNC-RFB desktop automation from a candy/box plan (out-of-process plugin plugin-vnc, pod AND vm targets; connect, authenticate, screenshot, click coordinates, type, RFB protocol interaction)"
-jetkvm-skill:
-    skill:
-        name: jetkvm
-        family: check
-        owner: charly-check
-        triggers:
-            - "the `jetkvm:` check verb / driving a JetKVM IP-KVM from a candy/box plan (out-of-process plugin; status, screenshot, ocr, keyboard/mouse, power, virtual media, USB, device config)"
-            - "a `kind: jetkvm` device entity / the `install` method / console-installer recipe / driving an OS installer (e.g. Omarchy) remotely over a KVM / wait-for-screen OCR"
-            - "opening a terminal on a remote machine over a KVM/VM console / running a shell command and reading its output via OCR / `run-command` / `open-terminal` / `close-terminal` / sudo with a password / entering a LUKS disk-encryption passphrase / `luks-unlock`"
-            - "continuous OCR-until-condition / named outcomes / if-then-else / case-switch / bounded while loop over a console / the `flow` method / setting the UEFI boot order from inside the OS / `efibootmgr` / `boot-order`"
-            - "generic console actions shared between JetKVM and VM (SPICE) / `sdk/kit` ConsoleSession + ConsoleFlow / `kit.ConsoleTransport`"
-            - "installing charly on a JetKVM / `charly-jetkvm` / running charly on the armv7 appliance / why there is no MCP server on the JetKVM"
 console-skill:
     skill:
         name: console-automation
@@ -2148,7 +2109,7 @@ console-skill:
             - "open a terminal on a remote machine / run a command and read its output via OCR / sudo over a console / enter a LUKS passphrase at the initramfs prompt"
             - "continuous OCR-until-condition / named outcomes / if-then-else / case-switch / bounded while over a console / the `flow` method"
             - "set the UEFI boot order from inside the OS / efibootmgr / boot-order / boot the installer medium once via --bootnext"
-            - "generic console actions shared between JetKVM and VM (SPICE) / `sdk/kit` ConsoleSession, ConsoleFlow, ConsoleTransport"
+            - "generic console actions over a VM console (SPICE) / `sdk/kit` ConsoleSession, ConsoleFlow, ConsoleTransport"
 cua-skill:
     skill:
         name: cua

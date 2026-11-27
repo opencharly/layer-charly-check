@@ -9,10 +9,10 @@ corpus from them.
 
 Canonical files:
 
-- `charly.yml` — the `charly-check:` concept candy entity plus 14 `skill:` nodes
-  (`check`, `adb`, `android`, `appium`, `cdp`, `check-sway-browser-vnc`, `dbus`,
-  `libvirt`, `record`, `spice`, `vnc`, `jetkvm`, `console-automation`, `cua`),
-  each carrying its routing metadata (`name`, `family`, `owner`, `triggers`).
+- `charly.yml` — the `charly-check:` concept candy entity plus 10 `skill:` nodes
+  (`check`, `cdp`, `check-sway-browser-vnc`, `dbus`, `libvirt`, `record`, `spice`,
+  `vnc`, `console-automation`, `cua`), each carrying its routing metadata
+  (`name`, `family`, `owner`, `triggers`).
 - `.agents/skills/<name>/SKILL.md` — a skill's BODY, one directory per node's
   `name:`. The file is the source of record for the prose; the node routes.
 - `.github/workflows/tag-on-merge.yml` — CalVer tag + `CHANGELOG/` on merge.
